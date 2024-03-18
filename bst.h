@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <utility>
 
+
 /**
  * A templated class for a Node in a search tree.
  * The getters for parent/left/right are virtual so
@@ -13,6 +14,7 @@
  * search trees, such as Red Black trees, Splay trees,
  * and AVL trees.
  */
+ //every node has a key and a value so not template <T> but template <A,B>
 template <typename Key, typename Value>
 class Node
 {
@@ -51,6 +53,7 @@ protected:
 /**
 * Explicit constructor for a node.
 */
+//inputting key and value, parents values to each new node that we create
 template<typename Key, typename Value>
 Node<Key, Value>::Node(const Key& key, const Value& value, Node<Key, Value>* parent) :
     item_(key, value),
@@ -97,6 +100,7 @@ template<typename Key, typename Value>
 const Key& Node<Key, Value>::getKey() const
 {
     return item_.first;
+    //first element of item_'s map (the key)
 }
 
 /**
@@ -198,7 +202,9 @@ public:
     virtual void insert(const std::pair<const Key, Value>& keyValuePair); //TODO
     virtual void remove(const Key& key); //TODO
     void clear(); //TODO
+    void deleteTree(Node<Key,Value>* curr);
     bool isBalanced() const; //TODO
+    int balanced(Node<Key, Value>* node) const;
     void print() const;
     bool empty() const;
 
@@ -266,7 +272,8 @@ Begin implementations for the BinarySearchTree::iterator class.
 template<class Key, class Value>
 BinarySearchTree<Key, Value>::iterator::iterator(Node<Key,Value> *ptr)
 {
-    // TODO
+    // 
+    current_ = ptr;
 }
 
 /**
@@ -276,6 +283,7 @@ template<class Key, class Value>
 BinarySearchTree<Key, Value>::iterator::iterator() 
 {
     // TODO
+    current_ = NULL;
 
 }
 
@@ -309,6 +317,7 @@ BinarySearchTree<Key, Value>::iterator::operator==(
     const BinarySearchTree<Key, Value>::iterator& rhs) const
 {
     // TODO
+    return this->current_ == rhs.current_;
 }
 
 /**
@@ -322,6 +331,8 @@ BinarySearchTree<Key, Value>::iterator::operator!=(
 {
     // TODO
 
+    return this->current_ != rhs.current_;
+
 }
 
 
@@ -333,6 +344,24 @@ typename BinarySearchTree<Key, Value>::iterator&
 BinarySearchTree<Key, Value>::iterator::operator++()
 {
     // TODO
+    if (current_ == NULL) {
+      return *this;
+    }
+    if (current_->getLeft() != NULL) {
+      current_ = current_->getLeft();
+      while (current_->getRight()!= NULL) {
+        current_ = current_->getLeft();
+      }
+    }
+    else {
+      Node<Key,Value> *temp = current_->getParent();
+      while (temp!= NULL && current_ == temp->getLeft()) {
+        current_ = temp;
+        temp = temp->getParent();
+      }
+      current_ = temp;
+    }
+    return *this;
 
 }
 
@@ -356,13 +385,14 @@ template<class Key, class Value>
 BinarySearchTree<Key, Value>::BinarySearchTree() 
 {
     // TODO
+    root_ = NULL;
 }
 
 template<typename Key, typename Value>
 BinarySearchTree<Key, Value>::~BinarySearchTree()
 {
     // TODO
-
+    clear();
 }
 
 /**
@@ -445,6 +475,37 @@ template<class Key, class Value>
 void BinarySearchTree<Key, Value>::insert(const std::pair<const Key, Value> &keyValuePair)
 {
     // TODO
+    if (empty()) { // if empty tree
+        root_ = new Node<Key,Value>(keyValuePair.first, keyValuePair.second, NULL); //maps key and value is new root of tree
+        return;
+    }
+    Node<Key,Value>* temp = root_; // temp node starting at root
+    while (temp != NULL) {
+        Key keytemp = temp->getKey(); // temp's key that starts @ root
+        if (keyValuePair.first < keytemp) { // will first compare with root's key
+            if (temp->getLeft() == NULL) {
+                temp->setLeft(new Node<Key,Value>(keyValuePair.first, keyValuePair.second, temp));
+                //if no left child exists, setting temp's left child as the new insertion node
+                return;
+            }
+            else {
+                temp = temp->getLeft(); // temp becomes left node
+            }
+        }
+        else if (keyValuePair.first == keytemp) { // key already exists 
+            temp->setValue(keyValuePair.second);
+            return;
+        }
+        else { // key is larger than keytemp
+            if (temp->getRight() == NULL) {
+                temp->setRight(new Node<Key, Value>(keyValuePair.first, keyValuePair.second, temp));
+                return; 
+            }
+            else {
+                temp = temp->getRight(); // temp becomes right Node
+            }
+        }
+    }
 }
 
 
@@ -457,6 +518,103 @@ template<typename Key, typename Value>
 void BinarySearchTree<Key, Value>::remove(const Key& key)
 {
     // TODO
+    Node<Key,Value>* temp = root_; //will start at root
+    Node<Key,Value>* parent = NULL;
+    bool found = false;
+
+    while (temp != NULL) {
+        if (key < temp->getKey()) {
+            parent = temp;
+            temp = temp->getLeft();
+        }
+        else if (key > temp->getKey()) {
+            parent = temp;
+            temp = temp->getRight();
+        }
+        else { // key IS the temp node ==
+           found = true;
+           break;
+        }
+    }
+
+    if (found == false) { // key was never found, can't delete anything
+        return;
+    }
+
+    // if reaches here, key exists in tree and was found
+    if (temp->getLeft() != NULL && temp->getRight() != NULL) {
+        // Node<Key,Value>* successor = temp->getRight(); //finding smallest node in right subtree
+        // while (successor->getLeft() != NULL) {
+        //     successor = successor->getLeft(); // moving to left child until smallest key that is still larger than key of 'temp'
+        // }
+        // nodeSwap(temp, succ);
+
+        Node<Key,Value>* pred = predecessor(temp);
+        while (pred->getRight() != NULL) {
+            pred = pred->getRight();
+        }
+        nodeSwap(temp, pred);
+    }
+
+    parent = temp->getParent();
+
+    // key is a leaf
+    if (temp->getLeft() == NULL && temp->getRight() == NULL) {
+        if (parent == NULL) { // is leaf and the root
+            root_ = NULL;
+        }
+        else if (parent->getLeft() == temp) {
+            parent->setLeft(NULL);
+        }
+        else {
+            parent->setRight(NULL);
+        }
+    }
+
+    // key has one child
+    else if (temp->getLeft() == NULL || temp->getRight() == NULL) { // checking for one child
+        Node<Key,Value>* child;
+        if (temp->getLeft() != NULL) {
+            child = temp->getLeft(); //assigning child to temp's left 
+        } else {
+            child = temp->getRight(); // assigning child to temp's right
+        }
+
+        //root is removed
+        if (parent == NULL) {
+            root_ = child; // child becomes new root 
+        }
+        else if (parent->getLeft() == temp) {
+            parent->setLeft(child); // child becomes parent's new left child
+        }
+        else {
+            parent->setRight(child); // child becomes parent's new right child
+        }
+        if (child != NULL) { 
+            child->setParent(parent); // updating child's new parent to originnal temp's parent
+        }
+    }
+
+    // else { // has both two children
+    //     Node<Key,Value>* successor = temp->getRight(); //finding smallest node in right subtree
+    //     while (successor->getLeft() != NULL) {
+    //         successor = successor->getLeft(); // moving to left child until smallest key that is still larger than key of 'temp'
+    //     }
+    //     //successor is found
+
+    //     nodeSwap(successor, temp);
+  
+    //     // Value tempValue = temp->getValue(); //gets value of temp
+    //     // temp->setValue(successor->getValue()); // sets value ''
+    //     // successor->setValue(tempValue);
+
+    //     // remove(successor->getKey()); // removing the successor
+    // }
+
+    // if (found) {
+        delete temp;
+    // }
+
 }
 
 
@@ -466,6 +624,21 @@ Node<Key, Value>*
 BinarySearchTree<Key, Value>::predecessor(Node<Key, Value>* current)
 {
     // TODO
+
+    if (current->getLeft() != NULL) {
+        Node<Key,Value>* temp = current->getLeft(); // left subtree
+        while(temp->getRight() != NULL) {
+            temp = temp->getRight();
+        }
+        return temp;
+    }  
+    // there's no left subtree/child
+    Node<Key, Value>* parent = current->getParent();
+    while (parent != NULL && current == parent->getLeft()) {
+        current = parent;
+        parent = parent->getParent();
+    }
+    return parent;
 }
 
 
@@ -477,6 +650,20 @@ template<typename Key, typename Value>
 void BinarySearchTree<Key, Value>::clear()
 {
     // TODO
+    Node<Key,Value>* temp = root_;
+    root_ = NULL;
+    deleteTree(temp);
+
+}
+template<typename Key, typename Value>
+void BinarySearchTree<Key, Value>::deleteTree(Node<Key,Value>* curr) {
+    if (curr == NULL) {
+        return;
+    } else {
+        deleteTree(curr->getLeft());
+        deleteTree(curr->getRight());
+        delete curr;
+    }
 }
 
 
@@ -488,7 +675,20 @@ Node<Key, Value>*
 BinarySearchTree<Key, Value>::getSmallestNode() const
 {
     // TODO
+    // leftmost of left subtrees
+    Node<Key, Value>* temp;
+    temp = root_;
+
+    if (temp == NULL) {
+        return temp; // empty tree
+    }
+
+    while (temp->getLeft() != NULL) {
+        temp = temp->getLeft();
+    } // traversing until it reaches right before NULL (leftest node)
+    return temp;
 }
+
 
 /**
 * Helper function to find a node with given key, k and
@@ -499,6 +699,20 @@ template<typename Key, typename Value>
 Node<Key, Value>* BinarySearchTree<Key, Value>::internalFind(const Key& key) const
 {
     // TODO
+    Node<Key, Value>* current = root_;
+
+    while (current != NULL) {
+      if (key == current->getKey()) {
+        return current;
+      }
+      else if (key < current->getKey()) {
+        current = current->getLeft();
+      }
+      else {
+        current = current->getRight();
+      }
+    }
+    return NULL;
 }
 
 /**
@@ -508,8 +722,34 @@ template<typename Key, typename Value>
 bool BinarySearchTree<Key, Value>::isBalanced() const
 {
     // TODO
+    return balanced(root_)!= -1;
 }
 
+template<typename Key, typename Value>
+int BinarySearchTree<Key,Value>::balanced(Node<Key, Value>* node) const {
+  if (node == NULL) {
+    return 0;
+  }
+
+  int leftheight = balanced(node->getLeft());
+  if (leftheight == -1) { return -1;}
+
+  int rightheight = balanced(node->getRight());
+  if (rightheight == -1) {return -1;}
+
+  if (abs(leftheight-rightheight)>1) {
+    return -1;
+  }
+
+  int max;
+  if (leftheight > rightheight) {
+    max = leftheight;
+  }
+  else {
+    max = rightheight;
+  }
+  return 1 + max;
+}
 
 
 template<typename Key, typename Value>
